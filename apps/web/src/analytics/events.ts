@@ -71,10 +71,13 @@ import type {
   NextStepActionClickProps,
   QuestionsFormClickProps,
   RunFailedToastClickProps,
+  RunRecoveryActionClickProps,
   AmrAuthResultProps,
   AmrAuthStageProps,
   AmrEntryClickProps,
   RunFailedToastSurfaceViewProps,
+  RunRecoveryActionSurfaceViewProps,
+  RunStartBlockedSurfaceViewProps,
   HomeRecommendationClickProps,
   HomeRecommendationSurfaceViewProps,
   StudioOnboardingHintClickProps,
@@ -260,6 +263,20 @@ export function trackRunFailedToastSurfaceView(
   send(track, 'surface_view', props);
 }
 
+export function trackRunRecoveryActionSurfaceView(
+  track: Track,
+  props: RunRecoveryActionSurfaceViewProps,
+): void {
+  send(track, 'surface_view', props);
+}
+
+export function trackRunStartBlockedSurfaceView(
+  track: Track,
+  props: RunStartBlockedSurfaceViewProps,
+): void {
+  send(track, 'surface_view', props);
+}
+
 export function trackPreviewRunStatusSurfaceView(
   track: Track,
   props: PreviewRunStatusSurfaceViewProps,
@@ -277,6 +294,13 @@ export function trackQuestionsFormSurfaceView(
 export function trackRunFailedToastGoAmrClick(
   track: Track,
   props: RunFailedToastClickProps,
+): void {
+  send(track, 'ui_click', props);
+}
+
+export function trackRunRecoveryActionClick(
+  track: Track,
+  props: RunRecoveryActionClickProps,
 ): void {
   send(track, 'ui_click', props);
 }
