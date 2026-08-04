@@ -20,6 +20,7 @@ import {
   compareCodexPluginShellVersions,
   parseCodexPluginAcquisitionManifest,
   parseCodexPluginHandoffDescriptor,
+  parseCodexPluginRuntimeAccess,
   parseCodexPluginRuntimeReady,
   parseCodexPluginUpdateCheck,
   resolveCodexPluginShellPaths,
@@ -801,6 +802,27 @@ export class CodexPluginRuntimeLauncher {
     return status;
   }
 
+  async readRuntimeAccessToken(
+    binding: DistributionRuntimeBindingV1,
+  ): Promise<string | null> {
+    if (binding.protocolVersion < 2) return null;
+    const shellPaths = resolveCodexPluginShellPaths(this.suitePaths);
+    const accessState = await readParsedJsonIfExists({
+      code: "RUNTIME_ACCESS_STATE_INVALID",
+      label: "runtime access state",
+      parse: parseCodexPluginRuntimeAccess,
+      path: shellPaths.accessPath,
+    });
+    if (accessState == null) {
+      throw new CodexPluginLauncherError(
+        "RUNTIME_ACCESS_UNAVAILABLE",
+        "protocol-v2 runtime access state is missing",
+      );
+    }
+    assertSameDistributionRuntimeIdentity(binding, accessState);
+    return accessState.accessToken;
+  }
+
   private async fetchRequestedManifest(
     timeoutMs: number,
   ): Promise<CodexPluginAcquisitionManifestV1> {
@@ -1165,6 +1187,9 @@ export class CodexPluginRuntimeLauncher {
     let child: ChildProcess | null = null;
     const handoffId = opaqueId("handoff");
     const resumeToken = randomBytes(32).toString("base64url");
+    const accessToken = expected.protocolVersion >= 2
+      ? randomBytes(32).toString("base64url")
+      : null;
     const handoffPath = join(shellPaths.handoffsRoot, `${handoffId}.json`);
     const readyPath = join(shellPaths.handoffsRoot, `${handoffId}.ready.json`);
     const createdAt = new Date().toISOString();
@@ -1246,6 +1271,9 @@ export class CodexPluginRuntimeLauncher {
           detached: true,
           env: {
             ...process.env,
+            ...(accessToken == null
+              ? {}
+              : { [CODEX_PLUGIN_RUNTIME_ENV.ACCESS_TOKEN]: accessToken }),
             [CODEX_PLUGIN_RUNTIME_ENV.CHANNEL]: expected.channel,
             [CODEX_PLUGIN_RUNTIME_ENV.DATA_ROOT]: this.suitePaths.dataRoot,
             [CODEX_PLUGIN_RUNTIME_ENV.HANDOFF_ID]: handoffId,
@@ -1333,6 +1361,15 @@ export class CodexPluginRuntimeLauncher {
         startedAt: now,
         updatedAt: now,
       };
+      if (accessToken == null) {
+        await rm(shellPaths.accessPath, { force: true });
+      } else {
+        await writeJsonAtomic(shellPaths.accessPath, {
+          ...expected,
+          accessToken,
+          schemaVersion: CODEX_PLUGIN_PROTOCOL_SCHEMA_VERSION,
+        });
+      }
       await writeJsonAtomic(storePaths.bindingPath, binding);
       await writeJsonAtomic(storePaths.activePath, pointer);
       if (armAttempt) await rm(storePaths.attemptPath, { force: true });

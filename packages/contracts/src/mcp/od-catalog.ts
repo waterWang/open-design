@@ -1,4 +1,16 @@
+export type OdMcpJsonSchema = {
+  additionalProperties?: boolean;
+  const?: unknown;
+  description?: string;
+  enum?: unknown[];
+  items?: OdMcpJsonSchema;
+  properties?: Record<string, OdMcpJsonSchema>;
+  required?: string[];
+  type?: string;
+};
+
 export type OdMcpToolDefinition = {
+  _meta?: Record<string, unknown>;
   annotations: {
     destructiveHint?: boolean;
     idempotentHint: boolean;
@@ -9,7 +21,7 @@ export type OdMcpToolDefinition = {
   description: string;
   inputSchema: {
     additionalProperties: boolean;
-    properties: Record<string, unknown>;
+    properties: Record<string, OdMcpJsonSchema>;
     required?: string[];
     type: "object";
   };
@@ -35,13 +47,121 @@ const PROJECT_ARG = {
   type: "string",
 };
 
+const PLUGIN_WORKFLOW_ID_ARG = {
+  description:
+    "Opaque workflow id issued by the local Open Design MCP after the first attributed call. Reuse it for later plugin-attributed calls; never invent or display it.",
+  type: "string",
+};
+
+const EXTERNAL_PLUGIN_CONTEXT_ARG = {
+  additionalProperties: false,
+  description:
+    "Bounded distribution context supplied by the verified plugin shell. Used for product analytics only, never authorization or billing.",
+  properties: {
+    distributionMechanism: {
+      enum: ["git_marketplace", "local_repo", "manual", "unknown"],
+      type: "string",
+    },
+    id: { const: "open-design", type: "string" },
+    publisherClass: {
+      enum: ["open_design_first_party", "third_party", "unknown"],
+      type: "string",
+    },
+    version: { type: "string" },
+  },
+  required: ["id", "version", "distributionMechanism", "publisherClass"],
+  type: "object",
+};
+
 export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
+  {
+    _meta: {
+      "openai/outputTemplate": "ui://open-design/artifact-card-v6.html",
+      "ui/resourceUri": "ui://open-design/artifact-card-v6.html",
+      ui: { resourceUri: "ui://open-design/artifact-card-v6.html" },
+    },
+    annotations: { ...WRITE_ANNOTATIONS, title: "Collect Open Design brief" },
+    description:
+      "Open an interactive Open Design brief card for a new artifact. Use the returned human-readable confirmation with any explicit execution mode; never ask the user to copy an internal draft id or nonce.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: {
+        artifactType: {
+          description: "Artifact workflow whose brief should be collected.",
+          enum: [
+            "website",
+            "product-prototype",
+            "presentation",
+            "document",
+            "image",
+            "video",
+            "audio",
+            "design-system",
+          ],
+          type: "string",
+        },
+        externalPluginContext: EXTERNAL_PLUGIN_CONTEXT_ARG,
+        knownAnswers: {
+          additionalProperties: true,
+          description: "Optional stable question-id answers already supplied by the user.",
+          type: "object",
+        },
+        locale: {
+          description:
+            "BCP-47 language of the current user request. Prefer the request language over the host UI language.",
+          type: "string",
+        },
+        pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG,
+        projectTitle: {
+          description: "Concise human-readable project title.",
+          type: "string",
+        },
+        skip: {
+          description: "Use recommended defaults without asking. Defaults to false.",
+          type: "boolean",
+        },
+      },
+      required: ["artifactType"],
+      type: "object",
+    },
+    name: "collect_brief",
+  },
+  {
+    annotations: { ...WRITE_ANNOTATIONS, title: "Confirm Open Design brief" },
+    description:
+      "Confirm the choices from the rendered Open Design brief card. Returns a readable summary; draft ids and nonces are internal widget data, never user-facing copy.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: {
+        answers: {
+          additionalProperties: true,
+          description: "Question-id to selected stable option values.",
+          type: "object",
+        },
+        briefDraftId: {
+          description: "Internal draft id returned by collect_brief.",
+          type: "string",
+        },
+        locale: {
+          description: "BCP-47 host locale used only as a fallback.",
+          type: "string",
+        },
+        nonce: {
+          description: "Internal nonce returned by collect_brief.",
+          type: "string",
+        },
+      },
+      required: ["briefDraftId", "nonce", "answers"],
+      type: "object",
+    },
+    name: "confirm_brief",
+  },
   {
     annotations: { ...READ_ANNOTATIONS, title: "List Open Design projects" },
     description: "List every Open Design project on this daemon.",
     inputSchema: {
       additionalProperties: false,
-      properties: {},
+      properties: { pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG },
       type: "object",
     },
     name: "list_projects",
@@ -52,7 +172,7 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
       'Project + file the user has open in Open Design right now. Returns {active:false, hint:"..."} when no project is active so the agent can ask the user to interact with Open Design (the active context expires ~5 minutes after the last user interaction). Most tools default to this when project is omitted, so you rarely need to call this directly.',
     inputSchema: {
       additionalProperties: false,
-      properties: {},
+      properties: { pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG },
       type: "object",
     },
     name: "get_active_context",
@@ -79,6 +199,7 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
             "Soft cap on total text bytes (default 1_500_000). Also capped at 200 files. Excess files are dropped and truncated:true is set.",
           type: "number",
         },
+        pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG,
         project: PROJECT_ARG,
       },
       type: "object",
@@ -297,6 +418,7 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
           description: "Human-readable project name.",
           type: "string",
         },
+        pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG,
         skill: {
           description: "Optional skill id to seed the project with.",
           type: "string",
@@ -313,7 +435,7 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
       "List Open Design skills you can pass to start_run as a recipe. Discovery only — Open Design runs the skill, not you.",
     inputSchema: {
       additionalProperties: false,
-      properties: {},
+      properties: { pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG },
       type: "object",
     },
     name: "list_skills",
@@ -324,10 +446,40 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
       "List installed Open Design plugins (packaged design workflows) you can pass to start_run as plugin + inputs.",
     inputSchema: {
       additionalProperties: false,
-      properties: {},
+      properties: { pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG },
       type: "object",
     },
     name: "list_plugins",
+  },
+  {
+    annotations: {
+      ...WRITE_ANNOTATIONS,
+      openWorldHint: true,
+      title: "Sign in to Open Design Cloud",
+    },
+    description:
+      "Start Open Design Cloud browser sign-in through the local Open Design daemon. Returns an activation URL and user code when manual completion is needed; never repeat the internal tool name to the user.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: { pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG },
+      type: "object",
+    },
+    name: "start_vela_login",
+  },
+  {
+    annotations: {
+      ...READ_ANNOTATIONS,
+      openWorldHint: true,
+      title: "Check Open Design Cloud sign-in",
+    },
+    description:
+      "Check whether Open Design Cloud browser sign-in is complete without exposing credentials; never repeat the internal tool name to the user.",
+    inputSchema: {
+      additionalProperties: false,
+      properties: { pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG },
+      type: "object",
+    },
+    name: "get_vela_login_status",
   },
   {
     annotations: { ...WRITE_ANNOTATIONS, title: "Generate with Open Design" },
@@ -354,11 +506,22 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
           description: "Plugin id from list_plugins to drive the run. Optional.",
           type: "string",
         },
+        pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG,
         project: PROJECT_ARG,
         prompt: {
           description:
             "What to make or change, in natural language. Optional when a plugin supplies its own brief.",
           type: "string",
+        },
+        requestId: {
+          description:
+            "Stable UUID or ULID for this confirmed generation action. Generate it once and reuse it verbatim for transport retries.",
+          type: "string",
+        },
+        resume: {
+          description:
+            "Set true only after the user tops up a paused Open Design Cloud run; reuse the exact original requestId and payload.",
+          type: "boolean",
         },
         serviceTier: {
           description:
@@ -381,6 +544,7 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
     inputSchema: {
       additionalProperties: false,
       properties: {
+        pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG,
         runId: {
           description: "Run id returned by start_run.",
           type: "string",
@@ -419,6 +583,7 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
             "When true, include agents whose binary is not installed. Defaults to false.",
           type: "boolean",
         },
+        pluginWorkflowId: PLUGIN_WORKFLOW_ID_ARG,
       },
       type: "object",
     },
@@ -427,6 +592,23 @@ export const OD_MCP_TOOL_DEFS: OdMcpToolDefinition[] = [
 ];
 
 export const OD_MCP_STATIC_RESOURCES = [
+  {
+    _meta: {
+      "openai/widgetPrefersBorder": true,
+      "ui/csp": { connectDomains: [], resourceDomains: [] },
+      "ui/prefersBorder": true,
+      ui: {
+        csp: { connectDomains: [], resourceDomains: [] },
+        prefersBorder: true,
+      },
+    },
+    description:
+      "Interactive local Open Design brief card shared by Open Design Cloud and Local Codex modes.",
+    mimeType: "text/html;profile=mcp-app",
+    name: "Open Design brief",
+    title: "Choose the artifact direction",
+    uri: "ui://open-design/artifact-card-v6.html",
+  },
   {
     description: "The project/file the user has open in Open Design right now.",
     mimeType: "application/json",

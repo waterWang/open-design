@@ -12,6 +12,7 @@ This file is the single source of truth for agents entering this repository. Rea
 - Directory-level agent guidance: `.github/AGENTS.md`, `apps/AGENTS.md`, `packages/AGENTS.md`, `tools/AGENTS.md`, `e2e/AGENTS.md`; focused control-plane guides include `tools/codex/AGENTS.md` and `tools/pack/AGENTS.md`.
 - Packaged auto-update architecture and high-confidence local harness: read `tools/pack/AGENTS.md` section "Packaged auto-update architecture and harness" before touching packaged updater code, release-channel identity, installer behavior, or updater UI.
 - Codex plugin local distribution and controlled Desktop acceptance: read `tools/codex/AGENTS.md` for ownership, core files, and hot operations; use `docs/testing/codex-plugin-desktop.md` for the full protocol and report formats.
+- Packaged build cache contract: `tools/pack/CACHE.md` (determinant rules, materialization-time parameters, confidence grading — required before changing any build-cache node key).
 
 ## Workspace directories
 

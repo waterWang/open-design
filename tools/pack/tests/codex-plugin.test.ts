@@ -293,7 +293,11 @@ describe("tools-pack codex-plugin", () => {
     expect(source).toContain("OD_RESOURCE_ROOT");
     expect(source).toContain("/api/ready");
     expect(source).toContain("@open-design\", \"daemon\", \"dist\", \"mcp.js");
+    expect(source).toContain("@open-design\", \"codex-plugin-proto\", \"dist\", \"index.mjs");
     expect(source).toContain('requestUrl.pathname !== "/mcp"');
+    expect(source).toContain('request.headers.authorization');
+    expect(source).toContain('parseCodexPluginMcpEnvelope');
+    expect(source).toContain('createMcpGatewaySession');
     expect(source).toContain('message.method === "tools/call"');
     expect(source).toContain('message.method === "resources/read"');
     expect(source).not.toContain("packedRuntimeVersion");
