@@ -38,26 +38,29 @@ export const uiP0Groups = {
       "ui/settings-connectors-auth-recovery.test.ts",
     ],
   },
-  "project-workspace": {
+  "project-workspace-core": {
     grep: String.raw`\[P0\]`,
     workers: 1,
     files: [
       "ui/app.test.ts",
       "ui/app-design-files.test.ts",
-      "ui/app-manual-edit.test.ts",
-      "ui/project-management-flows.test.ts",
       "ui/workspace-keyboard-flows.test.ts",
     ],
   },
-  "project-runtime": {
+  "project-workspace-editing": {
     grep: String.raw`\[P0\]`,
     workers: 1,
-    files: [
-      "ui/real-daemon-run.test.ts",
-      "ui/amr-run-failure-recovery.test.ts",
-      "ui/amr-logout-requires-relogin.test.ts",
-      "ui/settings-local-cli-codex-fallback.test.ts",
-    ],
+    files: ["ui/app-manual-edit.test.ts", "ui/project-management-flows.test.ts"],
+  },
+  "project-runtime-daemon": {
+    grep: String.raw`\[P0\]`,
+    workers: 1,
+    files: ["ui/real-daemon-run.test.ts", "ui/settings-local-cli-codex-fallback.test.ts"],
+  },
+  "project-runtime-recovery": {
+    grep: String.raw`\[P0\]`,
+    workers: 1,
+    files: ["ui/amr-run-failure-recovery.test.ts", "ui/amr-logout-requires-relogin.test.ts"],
   },
 } as const satisfies Record<string, UiPlaywrightGroup>;
 
@@ -65,8 +68,10 @@ export type UiP0GroupName = keyof typeof uiP0Groups;
 
 export const uiP0CiMatrix = [
   { name: "entry-settings", shard: "entry-settings" },
-  { name: "project-workspace", shard: "project-workspace" },
-  { name: "project-runtime", shard: "project-runtime" },
+  { name: "project-workspace-core", shard: "project-workspace-core" },
+  { name: "project-workspace-editing", shard: "project-workspace-editing" },
+  { name: "project-runtime-daemon", shard: "project-runtime-daemon" },
+  { name: "project-runtime-recovery", shard: "project-runtime-recovery" },
   { name: "workspace-restoration", shard: "workspace-restoration" },
 ] as const satisfies readonly UiP0CiMatrixEntry[];
 
@@ -108,7 +113,10 @@ export function validatePlaywrightSuiteTopology(): string[] {
   const errors: string[] = [];
   const knownGroups = new Set(Object.keys(uiP0Groups));
   const coverageFiles = sortedUnique(uiP0CoverageFiles);
-  const ciFiles = filesForUiP0Groups(uiP0CiMatrix.map((entry) => entry.shard));
+  const ciFileAssignments = uiP0CiMatrix.flatMap(
+    (entry) => uiP0Groups[entry.shard as UiP0GroupName]?.files ?? [],
+  );
+  const ciFiles = sortedUnique(ciFileAssignments);
 
   for (const entry of uiP0CiMatrix) {
     if (!knownGroups.has(entry.shard)) {
@@ -124,6 +132,14 @@ export function validatePlaywrightSuiteTopology(): string[] {
     errors.push(`UI P0 CI matrix unexpectedly covers ${file}`);
   }
 
+  const seenFiles = new Set<string>();
+  for (const file of ciFileAssignments) {
+    if (seenFiles.has(file)) {
+      errors.push(`UI P0 CI matrix covers ${file} more than once`);
+    }
+    seenFiles.add(file);
+  }
+
   for (const entry of visualCiMatrix) {
     if (entry.files.trim().length === 0) {
       errors.push(`Visual CI matrix entry ${entry.name} has no files`);
@@ -131,10 +147,6 @@ export function validatePlaywrightSuiteTopology(): string[] {
   }
 
   return errors;
-}
-
-function filesForUiP0Groups(names: readonly string[]): string[] {
-  return sortedUnique(names.flatMap((name) => uiP0Groups[name as UiP0GroupName]?.files ?? []));
 }
 
 function difference(left: readonly string[], right: readonly string[]): string[] {

@@ -842,7 +842,7 @@ test("merge-queue threshold escalates medium-confidence files to the full radius
   });
 });
 
-test("runtime-definition changes produce only a three-domain UI P0 shadow candidate", async () => {
+test("runtime-definition changes produce only a five-shard UI P0 shadow candidate", async () => {
   const { evaluateUiP0Shadow } = await import("../../../scripts/scopes.ts");
   const decision = evaluateUiP0Shadow([
     "apps/daemon/src/runtimes/defs/atomcode.ts",
@@ -853,7 +853,13 @@ test("runtime-definition changes produce only a three-domain UI P0 shadow candid
   assert.equal(decision.capability, "daemon-runtime-definition");
   assert.deepEqual(
     decision.matrix.map((entry) => entry.name),
-    ["entry-settings", "project-workspace", "project-runtime"],
+    [
+      "entry-settings",
+      "project-workspace-core",
+      "project-workspace-editing",
+      "project-runtime-daemon",
+      "project-runtime-recovery",
+    ],
   );
   assert.deepEqual(decision.outsideCapabilityFiles, []);
 });
@@ -870,7 +876,14 @@ test("runtime-definition shadow fails closed for mixed, unknown, empty, and unre
     assert.equal(decision.mode, "full-fallback", files.join(", "));
     assert.deepEqual(
       decision.matrix.map((entry) => entry.name),
-      ["entry-settings", "project-workspace", "project-runtime", "workspace-restoration"],
+      [
+        "entry-settings",
+        "project-workspace-core",
+        "project-workspace-editing",
+        "project-runtime-daemon",
+        "project-runtime-recovery",
+        "workspace-restoration",
+      ],
     );
   }
   assert.equal(evaluateUiP0Shadow([], false).reason, "files-unresolved");
@@ -920,7 +933,13 @@ test("plan trace reports the runtime-definition UI P0 shadow without changing th
   assert.equal(result.trace.uiP0Shadow.mode, "candidate");
   assert.deepEqual(
     result.trace.uiP0Shadow.matrix.map((entry) => entry.name),
-    ["entry-settings", "project-workspace", "project-runtime"],
+    [
+      "entry-settings",
+      "project-workspace-core",
+      "project-workspace-editing",
+      "project-runtime-daemon",
+      "project-runtime-recovery",
+    ],
   );
 });
 
